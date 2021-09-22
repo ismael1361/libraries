@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="./proxyTrack-1.0.JS"></script>
+</head>
+<body>
+    <script>
+        class MyClass{
+            constructor(){}
+
+            num = null;
+
+            isPrime(){
+                const num = this.num;
+                for(var i = 2; i < num; i++)
+                    if(num % i === 0) return false;
+                return num !== 1 && num !== 0;
+            }
+        }
+
+        const trackedClass = ProxyTrack(new MyClass(), {
+            filter: (data)=>{
+                if(data.type === 'get' && data.prop === 'isPrime') return false;
+                return true;
+            }
+        });
+
+        trackedClass.num = 573723653;
+
+        if (!trackedClass.isPrime()) {
+            console.log(`${trackedClass.num} is not prime`);
+        }
+
+    </script>
+</body>
+</html>
