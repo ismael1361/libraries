@@ -2,10 +2,10 @@
 
 class Matrix{
     constructor(...props){
-        this.modifyTo.apply(this, props);
+        this.parse.apply(this, props);
     }
 
-    modifyTo(...props){
+    parse(...props){
         let m = props[0];
 
         if(props.length === 2 && props.every(a => typeof a === "number")){
@@ -28,6 +28,10 @@ class Matrix{
                 this.data[i][j] = c;
             });
         });
+    }
+
+    toArray(){
+        return JSON.parse(JSON.stringify(this.data));
     }
 
     static isMatrix(m){
@@ -103,7 +107,7 @@ class Matrix{
     }
 
     T(){
-        this.modifyTo(Matrix.T(this));
+        this.parse(Matrix.T(this));
         return this;
     }
 
@@ -114,6 +118,19 @@ class Matrix{
                 calback(c, i, j);
             });
         });
+    }
+
+    map(calback){
+        if(typeof calback !== "function"){return;}
+        let result = new Matrix(this.row, this.col);
+
+        this.data.forEach((r, i)=>{
+            r.forEach((c, j)=>{
+                result.data[i][j] = calback(c, i, j);
+            });
+        });
+
+        return result;
     }
 
     static random(row, col){
@@ -129,7 +146,7 @@ class Matrix{
     }
 
     random(){
-        this.modifyTo(Matrix.random(this.row, this.col));
+        this.parse(Matrix.random(this.row, this.col));
         return this;
     }
 
@@ -198,18 +215,18 @@ class Matrix{
             b = new Matrix(a.row, a.col).fill(b);
         }
         
-        if(!(a instanceof Matrix) || !(b instanceof Matrix) || a.row !== b.col){
+        /*if(!(a instanceof Matrix) || !(b instanceof Matrix) || a.row !== b.col){
             throw new Error("It was not possible to perform the multiplication between matrices!");
-        }
+        }*/
 
         let result = new Array();
 
-        for(let j=0; j<a.col; j++){
-            result[j] = new Array();
-            for(let i=0; i<a.row; i++){
-                for(let p=0; p<b.row; p++){
-                    result[j][p] = !result[j][p] ? 0 : result[j][p];
-                    result[j][p] += a.data[j][i]*b.data[i][p];
+        for(var r = 0; r < a.row; ++r){
+            result[r] = new Array(b.col);
+            for(var c = 0; c < b.col; ++c){
+                result[r][c] = 0;
+                for(var i = 0; i < a.col; ++i){
+                    result[r][c] += a.data[r][i] * b.data[i][c];
                 }
             }
         }
@@ -218,7 +235,7 @@ class Matrix{
     }
 
     multiply(m){
-        this.modifyTo(Matrix.multiply(this, m));
+        this.parse(Matrix.multiply(this, m));
         return this;
     }
 
@@ -262,7 +279,7 @@ class Matrix{
     }
 
     concatRow(m){
-        this.modifyTo(Matrix.concatRow(this, m));
+        this.parse(Matrix.concatRow(this, m));
         return this;
     }
 
@@ -278,7 +295,7 @@ class Matrix{
     }
 
     concatColumn(m){
-        this.modifyTo(Matrix.concatColumn(this, m));
+        this.parse(Matrix.concatColumn(this, m));
         return this;
     }
 
@@ -287,7 +304,7 @@ class Matrix{
     }
 
     concat(m){
-        this.modifyTo(Matrix.concat(this, m));
+        this.parse(Matrix.concat(this, m));
         return this;
     }
 

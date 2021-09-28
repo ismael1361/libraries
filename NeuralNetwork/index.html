@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="../Matrix/matrix-1.0.js"></script>
+    <script src="./neural-network-1.0.js"></script>
+</head>
+<body>
+    <script>
+        let NN = NeuralNetwork;
+        let neural_network = new NN.Model();
+
+        neural_network.add(NN.layers.Dense(15, 'sigmoid', 3));
+        neural_network.add(NN.layers.Dense(1, 'sigmoid'));
+
+        console.log(neural_network.layers);
+
+        console.log(neural_network.predict([1, 0, 1]));
+
+        neural_network.loadModel("./Model_NeuralNetwork.bin");
+    </script>
+</body>
+</html>
