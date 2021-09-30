@@ -25,10 +25,6 @@ const getTrade = ()=>{
     });
 }
 
-String.prototype.capitalize = function(){
-    return this.charAt(0).toUpperCase() + this.slice(1);
-}
-
 class TraderChart extends React.Component {
     constructor(props) {
         super(props);
@@ -69,7 +65,9 @@ class TraderChart extends React.Component {
         this.timeline_options = {
             margin_left: 20,
             margin_right: 20,
-            width_signal: 10
+            margin_bottom: 2,
+            width_signal: 10,
+            height: 40
         }
     }
 
@@ -199,30 +197,35 @@ class TraderChart extends React.Component {
             const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
             const { width } = this.state.boundingClientRect;
             const { margin_left, margin_right } = this.timeline_options;
+            let { timelineAnchor } = this.props;
 
             let { timeline_pos } = this.state;
 
+            timelineAnchor = String(timelineAnchor).toLowerCase();
+            timelineAnchor = ["start", "end", "middle"].includes(timelineAnchor) ? timelineAnchor : "middle";
+
             timeline_pos = Math.max(Math.min(timeline_pos, margin_left), -Math.round(width_el - (width - margin_right)));
 
-            el.querySelectorAll("g.timeline_months > text").forEach((t, i)=>{
+            const labelsList = el.querySelectorAll("g.timeline_months > text, g.timeline_years > text");
+
+            let labelWidth = 0;
+
+            labelsList.forEach((t, i)=>{
+                let { width } = t.getBoundingClientRect();
+                labelWidth = Math.max(width, labelWidth);
+            });
+
+            labelsList.forEach((t, i)=>{
                 let start = Number(t.getAttribute("start-show") || "0");
                 let end = Number(t.getAttribute("end-show") || "0");
 
                 if(start > Math.abs(Math.round(timeline_pos - width)) || end < Math.abs(timeline_pos)){return;}
 
-                let quite = Math.abs(Math.round(timeline_pos - (width / 2)));
-
                 let { width: width_text } = t.getBoundingClientRect();
 
-                t.setAttribute("x", Math.round(Math.max(Math.min(quite, end - width_text), start + width_text)));
-            });
+                let to = timelineAnchor === "middle" ? (width / 2) : timelineAnchor === "end" ? width-(labelWidth*1.5) : (labelWidth*1.5);
 
-            el.querySelectorAll("g.timeline_years > text").forEach((t, i)=>{
-                let start = Number(t.getAttribute("start-show") || "0");
-                let end = Number(t.getAttribute("end-show") || "0");
-                let quite = Math.abs(Math.round(timeline_pos - (width / 2)));
-
-                let { width: width_text } = t.getBoundingClientRect()
+                let quite = Math.abs(Math.round(timeline_pos - to));
 
                 t.setAttribute("x", Math.round(Math.max(Math.min(quite, end - width_text), start + width_text)));
             });
@@ -233,18 +236,35 @@ class TraderChart extends React.Component {
     }
 
     timelineEvent = {
-        mousedown: ()=>{
+        main_mousedown: ()=>{
             this._timeline_dragging = true;
             this.timelineElement.style.cursor = "move";
+
+            document.removeEventListener("mouseup", this.timelineEvent.document_mouseup);
+            document.addEventListener("mouseup", this.timelineEvent.document_mouseup);
+
+            document.removeEventListener("mouseout", this.timelineEvent.document_mouseout);
+            document.addEventListener("mouseout", this.timelineEvent.document_mouseout);
+
+            document.removeEventListener("mousemove", this.timelineEvent.document_mousemove);
+            document.addEventListener("mousemove", this.timelineEvent.document_mousemove);
         },
-        mouseup: ()=>{
+        document_mouseup: ()=>{
             this._timeline_dragging = false;
             this.timelineElement.style.cursor = "auto";
+
+            document.removeEventListener("mouseup", this.timelineEvent.document_mouseup);
+            document.removeEventListener("mouseout", this.timelineEvent.document_mouseout);
+            document.removeEventListener("mousemove", this.timelineEvent.document_mousemove);
         },
-        mouseout: ()=>{
-            this.timelineEvent.mouseup();
+        document_mouseout: (e)=>{
+            e = e ? e : window.event;
+            let from = e.relatedTarget || e.toElement;
+            if(!from || from.nodeName == "HTML"){
+                this.timelineEvent.document_mouseup();
+            }
         },
-        mousemove: ({movementX, movementY})=>{
+        document_mousemove: ({movementX, movementY})=>{
             if(this._timeline_dragging !== true){return;}
             try{
                 const el = this.timelineElement.querySelector("g.timeline_content");
@@ -268,8 +288,10 @@ class TraderChart extends React.Component {
         if(element && element.addEventListener){
             this.timelineElement = element;
             for(let k in this.timelineEvent){
-                element.removeEventListener(k, this.timelineEvent[k], true);
-                element.addEventListener(k, this.timelineEvent[k], true);
+                if((/^main_/i).test(k) !== true){continue;}
+                let n = k.replace(/^main_/i, "");
+                element.removeEventListener(n, this.timelineEvent[k], true);
+                element.addEventListener(n, this.timelineEvent[k], true);
             }
         }
     }
@@ -290,12 +312,12 @@ class TraderChart extends React.Component {
 
         const { theme } = this.props;
         const { timeline_pos } = this.state;
+        
+        let width_drag = width;
 
-        const { width_signal } = this.timeline_options;
+        const { margin_bottom, width_signal, height: height_drag } = this.timeline_options;
 
         const { timeline_color } = theme in this.theme ? this.theme[theme] : this.theme["light"];
-        
-        let width_drag = width, height_drag = 50;
 
         let days_indicator_path = new Array(days+1).fill("");
 
@@ -322,7 +344,7 @@ class TraderChart extends React.Component {
         });
         month_indicator_path = month_indicator_path.join(" ");
 
-        return <g ref={this.applyEventTimeline} className="timeline_drag" transform={`translate(0, ${height-height_drag})`}>
+        return <g ref={this.applyEventTimeline} className="timeline_drag" transform={`translate(0, ${height-margin_bottom-height_drag})`}>
             <g className="timeline_content" transform={`translate(${timeline_pos}, 0)`}>
                 <g className="timeline_days" transform="translate(0, 0)" opacity="0.3">
                     <path d={days_indicator_path} stroke={timeline_color} stroke-width="2" fill="none"/>
@@ -403,7 +425,7 @@ class Main extends React.Component{
                 <TraderChart data={this.state.data} theme={"light"} width={"auto"} height={400}/>
             </div>
             <div>
-                <TraderChart data={this.state.data} theme={"dark"} width={"auto"} height={500}/>
+                <TraderChart data={this.state.data} timelineAnchor={"end"} theme={"dark"} width={"auto"} height={500}/>
             </div>
         </div>;
     }
