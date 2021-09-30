@@ -59,7 +59,8 @@ class TraderChart extends React.Component {
             minVolume: 0,
             dateEnd: new Date(),
             dateStart: new Date(),
-            data: []
+            data: [],
+            isDataValid: false
         }
 
         this.timeline_options = {
@@ -102,7 +103,8 @@ class TraderChart extends React.Component {
             minVolume: minVolume,
             dateEnd: new Date(dateEnd),
             dateStart: new Date(dateStart),
-            data: data
+            data: data,
+            isDataValid: true
         };
 
         this.setState({}, ()=>{
@@ -239,6 +241,9 @@ class TraderChart extends React.Component {
         main_mousedown: ()=>{
             this._timeline_dragging = true;
             this.timelineElement.style.cursor = "move";
+            this.timelineElement.style.opacity = "1";
+
+            window.clearTimeout(this._timeline_dragging_timeout);
 
             document.removeEventListener("mouseup", this.timelineEvent.document_mouseup);
             document.addEventListener("mouseup", this.timelineEvent.document_mouseup);
@@ -252,6 +257,10 @@ class TraderChart extends React.Component {
         document_mouseup: ()=>{
             this._timeline_dragging = false;
             this.timelineElement.style.cursor = "auto";
+
+            this._timeline_dragging_timeout = window.setTimeout(()=>{
+                this.timelineElement.style.opacity = "0.6";
+            }, 2000);
 
             document.removeEventListener("mouseup", this.timelineEvent.document_mouseup);
             document.removeEventListener("mouseout", this.timelineEvent.document_mouseout);
@@ -299,7 +308,7 @@ class TraderChart extends React.Component {
     getTimeline(){
         let dateEnd = new Date(), dateStart = new Date(dateEnd.getFullYear(), dateEnd.getMonth()-4, 1);
 
-        if(new Date(this.data.dateEnd).getDate() !== new Date(this.data.dateStart).getDate()){
+        if(this.data.isDataValid){
             dateEnd = new Date(this.data.dateEnd);
             dateStart = new Date(this.data.dateStart);
         }
@@ -344,7 +353,10 @@ class TraderChart extends React.Component {
         });
         month_indicator_path = month_indicator_path.join(" ");
 
-        return <g ref={this.applyEventTimeline} className="timeline_drag" transform={`translate(0, ${height-margin_bottom-height_drag})`}>
+        return <g ref={this.applyEventTimeline} className="timeline_drag" transform={`translate(0, ${height-margin_bottom-height_drag})`} style={{
+            opacity: "0.6",
+            transition: "opacity 0.2s ease-in-out 0s"
+        }}>
             <g className="timeline_content" transform={`translate(${timeline_pos}, 0)`}>
                 <g className="timeline_days" transform="translate(0, 0)" opacity="0.3">
                     <path d={days_indicator_path} stroke={timeline_color} stroke-width="2" fill="none"/>
