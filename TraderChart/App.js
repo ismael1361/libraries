@@ -1,3 +1,5 @@
+//https://www.freecodecamp.org/news/how-to-build-historical-price-charts-with-d3-js-72214aaf6ba3/
+
 const getTrade = ()=>{
     return new Promise((result, reject)=>{
         fetch("./resources/Binance_BTCUSDT_d.csv").then(r => r.text()).then((r)=>{
@@ -77,6 +79,9 @@ class TraderChart extends React.Component {
 
         if(isDataValid !== true){return;}
 
+        let { numberOfPricePoints } = this.props;
+        numberOfPricePoints = typeof numberOfPricePoints === "number" ? (Math.max(7, numberOfPricePoints) - 1) : 49;
+
         data.sort((a, b)=>{
             return b["date"] - a["date"];
         });
@@ -85,7 +90,7 @@ class TraderChart extends React.Component {
         let maxVolume = -Infinity, minVolume = Infinity;
         let dateStart = new Date(), dateEnd = new Date(0);
 
-        data.forEach(v=>{
+        const result = data.map((v, index)=>{
             maxValue = Math.max(maxValue, v["open"], v["high"], v["low"], v["close"]);
             minValue = Math.min(minValue, v["open"], v["high"], v["low"], v["close"]);
 
@@ -94,6 +99,15 @@ class TraderChart extends React.Component {
 
             dateStart = Math.min(dateStart, v["date"]);
             dateEnd = Math.max(dateEnd, v["date"]);
+
+            const start = Math.max(0, index - numberOfPricePoints);
+            const end = index;
+
+            const subset = data.slice(start, end + 1);
+            const sum = subset.reduce((a, b) => (a + b['close']), 0);
+
+            v["average"] = (sum / subset.length);
+            return v;
         });
 
         this.data = {
@@ -103,9 +117,11 @@ class TraderChart extends React.Component {
             minVolume: minVolume,
             dateEnd: new Date(dateEnd),
             dateStart: new Date(dateStart),
-            data: data,
+            data: result,
             isDataValid: true
         };
+
+        console.log(this.data.data[0]);
 
         this.setState({}, ()=>{
             this.initSVG();
@@ -235,6 +251,49 @@ class TraderChart extends React.Component {
             this.state.timeline_pos = timeline_pos;
             el.setAttribute("transform", `translate(${timeline_pos}, 0)`);
         }catch(e){}
+    }
+
+    //https://apexcharts.com/javascript-chart-demos/candlestick-charts/basic/
+    getPathMarkerBoxplot = (index)=>{
+        if(this.data.isDataValid !== true){return "";}
+
+        index = typeof index === "number" ? Math.min(0, Math.max(this.data.data.length, index)) : 0;
+        const d = this.data.data[index];
+
+        const { width, height} = this.state.boundingClientRect;
+        const { width_signal, height: height_drag } = this.timeline_options;
+
+        let height_area = height-50;
+
+        let rect = {
+            x: 0, y: 0,
+            width: 0, height: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
+            top_box: 0, bottom_box: 0, center: 0
+        };
+
+        rect.width = width_signal * 0.9;
+
+        rect.left = rect.x = (width_signal * index) - (rect.width/2);
+        rect.top = rect.y = height_area * ((d["high"] - this.data.minValue)/(this.data.maxValue - this.data.minValue));
+        rect.bottom = height_area * ((d["low"] - this.data.minValue)/(this.data.maxValue - this.data.minValue));
+        rect.right = rect.left + rect.width;
+
+        rect.height = rect.bottom - rect.top;
+
+        rect.top_box = height_area * ((Math.min(d["open"], d["close"]) - this.data.minValue)/(this.data.maxValue - this.data.minValue));
+        rect.bottom_box = height_area * ((Math.max(d["open"], d["close"]) - this.data.minValue)/(this.data.maxValue - this.data.minValue));
+
+        rect.center = rect.left + (rect.width/2);
+
+        return `M${rect.left},${rect.top_box} L${rect.center},${rect.top_box} L${rect.center},${rect.top} L${rect.center},${rect.top_box} L${rect.right},${rect.top_box} L${rect.right},${rect.bottom_box} L${rect.center},${rect.bottom_box} L${rect.center},${rect.bottom} L${rect.center},${rect.bottom_box} L${rect.left},${rect.bottom_box} L${rect.left},${rect.top_box} Z`;
+    }
+
+    getArea(){
+        if(this.data.isDataValid !== true){return null;}
+        return <g className="boxplot_area" transform={`translate(0, 0)`}>
+            {this.data.data.map((v, i)=><path d={this.getPathMarkerBoxplot(i)} fill="rgba(0,183,70,1)" fill-opacity="1" stroke="#00b746" stroke-opacity="1" stroke-linecap="butt" stroke-width="1" stroke-dasharray="0"/>)}
+        </g>
     }
 
     timelineEvent = {
@@ -410,6 +469,7 @@ class TraderChart extends React.Component {
                 <g clip-path={`url(#${"RectPanelClip_"+this.id})`}>
                     <rect x="0" y="0" width={boundingClientRect.width} height={boundingClientRect.height} fill={background} stroke="none"/>
 
+                    {this.getArea()}
                     {this.getTimeline()}
                 </g>
             </svg>
