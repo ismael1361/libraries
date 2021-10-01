@@ -289,7 +289,7 @@ class TraderChart extends React.Component {
                 let path = ["", ""];
 
                 for(let i=start; i<=end; i++){
-                    path[this.data.data[i]["close"] > this.data.data[i]["open"] ? 0 : 1] += this.getPathMarkerBoxplot(i);
+                    path[this.data.data[i]["close"] < this.data.data[i]["open"] ? 0 : 1] += this.getPathMarkerBoxplot(i);
                 }
 
                 this.svg_area_ref.current.querySelector("path.boxplot_area_path_low").setAttribute("d", path[0]);
@@ -363,7 +363,7 @@ class TraderChart extends React.Component {
     timelineEvent = {
         main_mousedown: ()=>{
             this._timeline_dragging = true;
-            this.timelineElement.style.cursor = "move";
+            document.body.style.cursor = "move";
             this.timelineElement.style.opacity = "1";
 
             window.clearTimeout(this._timeline_dragging_timeout);
@@ -379,7 +379,7 @@ class TraderChart extends React.Component {
         },
         document_mouseup: ()=>{
             this._timeline_dragging = false;
-            this.timelineElement.style.cursor = "auto";
+            document.body.style.cursor = "";
 
             this._timeline_dragging_timeout = window.setTimeout(()=>{
                 this.timelineElement.style.opacity = "0.6";
