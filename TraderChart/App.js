@@ -67,6 +67,7 @@ class TraderChart extends React.Component {
         }
 
         this.timeline_options = {
+            margin_top: 20,
             margin_left: 20,
             margin_right: 20,
             margin_bottom: 2,
@@ -81,7 +82,8 @@ class TraderChart extends React.Component {
         if(isDataValid !== true){return;}
 
         let { numberOfPricePoints } = this.props;
-        numberOfPricePoints = typeof numberOfPricePoints === "number" ? (Math.max(7, numberOfPricePoints) - 1) : 49;
+
+        numberOfPricePoints = typeof numberOfPricePoints === "number" ? (Math.max(7, numberOfPricePoints) - 1) : 13;
 
         data.sort((a, b)=>{
             return b["date"] - a["date"];
@@ -105,19 +107,21 @@ class TraderChart extends React.Component {
         const result = [];
         
         data.forEach((v, index)=>{
+            let value = JSON.parse(JSON.stringify(v));
+
             const start = Math.max(0, index - numberOfPricePoints);
             const end = index;
 
             const subset = data.slice(start, end + 1);
             const sum = subset.reduce((a, b) => (a + b['close']), 0);
 
-            v["average"] = (sum / subset.length);
+            value["average"] = (sum / subset.length);
 
-            v["date"] = new Date(v["date"]);
+            value["date"] = new Date(value["date"]);
 
-            let days = Math.round((v["date"] - dateStart)/(1000*60*60*24));
+            let days = Math.round((value["date"] - dateStart)/(1000*60*60*24));
 
-            result[days] = v;
+            result[days] = value;
         });
 
         this.data = {
@@ -209,9 +213,9 @@ class TraderChart extends React.Component {
             const el = this.timelineElement.querySelector("g.timeline_content");
             const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
             const { width } = this.state.boundingClientRect;
-            const { margin_right } = this.timeline_options;
+            const { margin_right, width_signal } = this.timeline_options;
 
-            const p = Math.round(width_el - (width - margin_right));
+            const p = Math.round(width_el - (width - (margin_right + (width_signal/2))));
 
             this.state.timeline_pos = -p;
             //this.state.timeline_pos = 0;
@@ -247,7 +251,7 @@ class TraderChart extends React.Component {
             const el = this.timelineElement.querySelector("g.timeline_content");
             const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
             const { width } = this.state.boundingClientRect;
-            const { margin_left, margin_right, width_signal } = this.timeline_options;
+            const { margin_top, margin_left, margin_right, width_signal } = this.timeline_options;
             let { timelineAnchor } = this.props;
 
             let { timeline_pos } = this.state;
@@ -255,7 +259,7 @@ class TraderChart extends React.Component {
             timelineAnchor = String(timelineAnchor).toLowerCase();
             timelineAnchor = ["start", "end", "middle"].includes(timelineAnchor) ? timelineAnchor : "middle";
 
-            timeline_pos = Math.max(Math.min(timeline_pos, margin_left), -Math.round(width_el - (width - margin_right)));
+            timeline_pos = Math.max(Math.min(timeline_pos, (margin_left + (width_signal/2))), -Math.round(width_el - (width - (margin_right + (width_signal/2)))));
 
             const labelsList = el.querySelectorAll("g.timeline_months > text, g.timeline_years > text");
 
@@ -286,21 +290,76 @@ class TraderChart extends React.Component {
 
             if(this.svg_area_ref && this.svg_area_ref.current){
                 const {start, end} = this.getAreaSlice();
-                let path = ["", ""];
+                let path = ["", "", "", ""];
 
                 for(let i=start; i<=end; i++){
-                    path[this.data.data[i]["close"] < this.data.data[i]["open"] ? 0 : 1] += this.getPathMarkerBoxplot(i);
+                    let p = this.getPathMarkerBoxplot(i);
+                    path[this.data.data[i]["close"] < this.data.data[i]["open"] ? 0 : 1] += p[0];
+                    path[this.data.data[i]["close"] < this.data.data[i]["open"] ? 2 : 3] += p[1];
                 }
+
+                this.svg_area_ref.current.querySelector("path.boxplot_area_path_average").setAttribute("d", this.getPathAverage());
+
+                this.svg_area_ref.current.querySelector("path.boxplot_area_path_volume_low").setAttribute("d", path[2]);
+                this.svg_area_ref.current.querySelector("path.boxplot_area_path_volume_high").setAttribute("d", path[3]);
 
                 this.svg_area_ref.current.querySelector("path.boxplot_area_path_low").setAttribute("d", path[0]);
                 this.svg_area_ref.current.querySelector("path.boxplot_area_path_high").setAttribute("d", path[1]);
 
-                this.svg_area_ref.current.setAttribute("transform", `translate(${timeline_pos}, 0)`);
+                this.svg_area_ref.current.setAttribute("transform", `translate(${timeline_pos}, ${margin_top})`);
             }
-        }catch(e){}
+        }catch(e){console.log(e);}
     }
 
     //https://apexcharts.com/javascript-chart-demos/candlestick-charts/basic/
+    getBasicSetting = ()=>{
+        const { width, height} = this.state.boundingClientRect;
+        const { margin_top, margin_right, margin_bottom: margin_bottom_drag, width_signal, height: height_drag } = this.timeline_options;
+
+        let width_area = width - margin_right;
+        let height_area = height - (height_drag + margin_bottom_drag + margin_top + 10);
+
+        const {start, end} = this.getAreaSlice();
+
+        const d_area = this.data.data.slice(start, end+1);
+
+        const maxValue = Math.max.apply(null, d_area.map(v => Math.max(v["high"], v["average"])));
+        const minValue = Math.min.apply(null, d_area.map(v => Math.min(v["low"], v["average"])));
+
+        let maxVolume = Math.max.apply(null, d_area.map(v => v["volume"]));
+        let minVolume = Math.min.apply(null, d_area.map(v => v["volume"]));
+        maxVolume = maxVolume+(maxVolume * 0.1);
+        minVolume = Math.max(0, minVolume-(minVolume * 0.1));
+
+        let deficit_width = 0;
+
+        if(this.timelineElement && this.timelineElement.querySelector){
+            const { width: width_timeline_days } = this.timelineElement.querySelector("g.timeline_content > g.timeline_days").getBoundingClientRect();
+            deficit_width = Math.max(0, (Math.round(width_timeline_days/width_signal) + 1) - this.data.data.length)*width_signal;
+        }
+
+        let dateEnd = new Date(), dateStart = new Date(dateEnd.getFullYear(), dateEnd.getMonth()-4, 1);
+
+        if(this.data.isDataValid){
+            dateEnd = new Date(this.data.dateEnd);
+            dateStart = new Date(this.data.dateStart);
+            
+            if(this.data.data.length * width_signal < width){
+                dateStart = new Date(dateEnd.getFullYear(), dateEnd.getMonth(), dateEnd.getDate() - (width/width_signal));
+            }
+        }
+
+        return {
+            width, height,
+            width_area, height_area, width_signal,
+            start, end, d_area,
+            maxValue, minValue,
+            maxVolume, minVolume,
+            deficit_width,
+            dateEnd, dateStart
+        }
+    }
+
     getPathMarkerBoxplot = (index)=>{
         if(this.data.isDataValid !== true || typeof index !== "number" || index < 0 || index >= this.data.data.length){return "";}
 
@@ -310,22 +369,9 @@ class TraderChart extends React.Component {
             return "";
         }
 
-        const { width, height} = this.state.boundingClientRect;
-        const { margin_bottom: margin_bottom_drag, width_signal, height: height_drag } = this.timeline_options;
-
-        let height_area = height - (height_drag + margin_bottom_drag + 10);
-
-        const {start, end} = this.getAreaSlice();
+        const {height_area, start, end, maxValue, minValue, maxVolume, minVolume, deficit_width, width_signal} = this.getBasicSetting();
 
         if(start > index || end < index){return "";}
-
-        const d_area = this.data.data.slice(start, end+1);
-
-        const maxValue = Math.max.apply(null, d_area.map(v => v["high"]));
-        const minValue = Math.min.apply(null, d_area.map(v => v["low"]));
-
-        const { width: width_timeline_days } = this.timelineElement.querySelector("g.timeline_content > g.timeline_days").getBoundingClientRect();
-        const deficit_width = Math.max(0, (Math.round(width_timeline_days/width_signal) + 1) - this.data.data.length)*width_signal;
 
         let rect = {
             x: 0, y: 0,
@@ -348,12 +394,53 @@ class TraderChart extends React.Component {
 
         rect.center = rect.left + (rect.width/2);
 
-        return `M${rect.left},${rect.top_box} L${rect.center},${rect.top_box} L${rect.center},${rect.top} L${rect.center},${rect.top_box} L${rect.right},${rect.top_box} L${rect.right},${rect.bottom_box} L${rect.center},${rect.bottom_box} L${rect.center},${rect.bottom} L${rect.center},${rect.bottom_box} L${rect.left},${rect.bottom_box} L${rect.left},${rect.top_box} Z`;
+        const pathPicker = `M${rect.left},${rect.top_box} L${rect.center},${rect.top_box} L${rect.center},${rect.top} L${rect.center},${rect.top_box} L${rect.right},${rect.top_box} L${rect.right},${rect.bottom_box} L${rect.center},${rect.bottom_box} L${rect.center},${rect.bottom} L${rect.center},${rect.bottom_box} L${rect.left},${rect.bottom_box} L${rect.left},${rect.top_box} Z`;
+
+        const bar_width = Math.max(1, width_signal * 0.5) - 2;
+
+        const height_volume = 0.2;
+
+        const bar_top = (height_area * (1 - height_volume)) + Math.round((height_area * height_volume)  * ((d["volume"] - minVolume)/(maxVolume - minVolume)));
+        const bar_left = Math.round(rect.center - (bar_width/2));
+        const bar_right = Math.round(bar_left + bar_width);
+
+        const pathVolume = `M${bar_left} ${height_area} L${bar_left} ${bar_top} L${bar_right} ${bar_top} L${bar_right} ${height_area} Z`;
+
+        return [pathPicker, pathVolume];
+    }
+
+    getPathAverage = ()=>{
+        if(this.data.isDataValid !== true){return "";}
+
+        const {height_area, start, end, maxValue, minValue, deficit_width, d_area, width_signal, dateStart, dateEnd} = this.getBasicSetting();
+
+        let result = [];
+
+        d_area.forEach((v, i)=>{
+            let x = 0, y = 0;
+            let index = Math.round((new Date(v["date"]) - dateStart)/(1000*60*60*24))+1;
+            index = i + start;
+
+            x = deficit_width + (width_signal * index);
+            y = height_area * ((v["average"] - minValue)/(maxValue - minValue));
+
+            result.push(`${x} ${y}`);
+        });
+
+        return "M" + result.join(" L");
     }
 
     getArea(){
         if(this.data.isDataValid !== true){return null;}
-        return <g ref={this.svg_area_ref} className="boxplot_area" transform={`translate(0, 0)`}>
+        const { margin_top } = this.timeline_options;
+
+        return <g ref={this.svg_area_ref} className="boxplot_area" transform={`translate(${this.state.timeline_pos}, ${margin_top})`}>
+            <path className={"boxplot_area_path_volume_low"} d="" fill={'#E91E63'} fill-opacity="0.2" stroke={'none'}/>
+
+            <path className={"boxplot_area_path_volume_high"} d="" fill={'#2196F3'} fill-opacity="0.2" stroke={'none'}/>
+
+            <path className={"boxplot_area_path_average"} d="" fill={'none'} stroke={'#FF8900'} stroke-opacity="1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+
             <path className={"boxplot_area_path_low"} d="" fill={'#c0392b'} fill-opacity="1" stroke={'#c0392b'} stroke-opacity="1" stroke-linecap="butt" stroke-width="2" stroke-dasharray="0"/>
 
             <path className={"boxplot_area_path_high"} d="" fill={'#03a678'} fill-opacity="1" stroke={'#03a678'} stroke-opacity="1" stroke-linecap="butt" stroke-width="2" stroke-dasharray="0"/>
@@ -403,9 +490,9 @@ class TraderChart extends React.Component {
                 const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
                 const p = Math.round(this.state.timeline_pos + movementX);
                 const { width, height } = this.state.boundingClientRect;
-                const { margin_right } = this.timeline_options;
+                const { margin_right, margin_left, width_signal } = this.timeline_options;
 
-                if(p >= this.timeline_options.margin_left || p <= -Math.round(width_el - (width - margin_right))){
+                if(p >= (margin_left + (width_signal/2)) || p <= -Math.round(width_el - (width - (margin_right + (width_signal/2))))){
                    return; 
                 }
 
@@ -428,21 +515,10 @@ class TraderChart extends React.Component {
         }
     }
 
-    getTimeline(){
-        let dateEnd = new Date(), dateStart = new Date(dateEnd.getFullYear(), dateEnd.getMonth()-4, 1);
-
-        const { width, height } = this.state.boundingClientRect;
-
+    getTimeline = ()=>{
         const { margin_bottom, width_signal, height: height_drag } = this.timeline_options;
 
-        if(this.data.isDataValid){
-            dateEnd = new Date(this.data.dateEnd);
-            dateStart = new Date(this.data.dateStart);
-            
-            if(this.data.data.length * width_signal < width){
-                dateStart = new Date(dateEnd.getFullYear(), dateEnd.getMonth(), dateEnd.getDate() - (width/width_signal));
-            }
-        }
+        const {width, height, dateEnd, dateStart} = this.getBasicSetting();
 
         let days = Math.round((dateEnd-dateStart)/(1000*60*60*24))+1;
         let month_days = [];
@@ -520,6 +596,10 @@ class TraderChart extends React.Component {
         const { theme, width, height } = this.props;
         const { boundingClientRect } = this.state;
 
+        const { margin_top } = this.timeline_options;
+
+        const { width_area, height_area } = this.getBasicSetting();
+
         const { background } = theme in this.theme ? this.theme[theme] : this.theme["light"];
 
         return (<div ref={this.divMain} style={{height: (!width ? "auto" : width), height: (!height ? 500 : height), overflow: "hidden", userSelect: "none"}}>
@@ -532,12 +612,17 @@ class TraderChart extends React.Component {
                     <clipPath id={"RectPanelClip_"+this.id}>
                         <path d={this.getPathRectPanel()} />
                     </clipPath>
+                    <clipPath id={"RectAreaClip_"+this.id}>
+                        <path d={`M0 ${margin_top} L${width_area} ${margin_top} L${width_area} ${height_area + margin_top} L0 ${height_area + margin_top} Z`} />
+                    </clipPath>
                 </defs>
 
                 <g clip-path={`url(#${"RectPanelClip_"+this.id})`}>
                     <rect x="0" y="0" width={boundingClientRect.width} height={boundingClientRect.height} fill={background} stroke="none"/>
 
-                    {this.getArea()}
+                    <g clip-path={`url(#${"RectAreaClip_"+this.id})`}>
+                        {this.getArea()}
+                    </g>
                     {this.getTimeline()}
                 </g>
             </svg>
