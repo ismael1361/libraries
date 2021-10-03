@@ -1,3 +1,11 @@
+/*const adjustTextBy = (textNode, width, height)=>{
+    const bb = textNode.getBBox();
+    const widthTransform = width / bb.width;
+    const heightTransform = height / bb.height;
+    const value = widthTransform < heightTransform ? widthTransform : heightTransform;
+    textNode.setAttribute("transform", "matrix("+value+", 0, 0, "+value+", 0,0)");
+}*/
+
 class TraderChart extends React.Component {
     constructor(props) {
         super(props);
@@ -294,13 +302,13 @@ class TraderChart extends React.Component {
 
         const d_area = this.data.data.slice(start, end+1);
 
-        const maxValue = Math.max.apply(null, d_area.map(v => Math.max(v["high"], v["average"])));
-        const minValue = Math.min.apply(null, d_area.map(v => Math.min(v["low"], v["average"])));
+        const maxValue = Math.round(Math.max.apply(null, d_area.map(v => Math.max(v["high"], v["average"]))));
+        const minValue = Math.floor(Math.min.apply(null, d_area.map(v => Math.min(v["low"], v["average"]))));
 
         let maxVolume = Math.max.apply(null, d_area.map(v => v["volume"]));
         let minVolume = Math.min.apply(null, d_area.map(v => v["volume"]));
-        maxVolume = maxVolume+(maxVolume * 0.1);
-        minVolume = Math.max(0, minVolume-(minVolume * 0.1));
+        maxVolume = Math.round(maxVolume+(maxVolume * 0.1));
+        minVolume = Math.floor(Math.max(0, minVolume-(minVolume * 0.1)));
 
         let deficit_width = 0;
 
