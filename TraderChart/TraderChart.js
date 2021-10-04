@@ -168,6 +168,11 @@ class TraderChart extends React.Component {
         }
     }
 
+    getTheme = ()=>{
+        const { theme } = this.props;
+        return theme in this.theme ? this.theme[theme] : this.theme["light"];
+    }
+
     getPathRectPanel(){
         let rect = {
             x: 0, y: 0,
@@ -426,6 +431,40 @@ class TraderChart extends React.Component {
         </g>
     }
 
+    getBasicSettingGridlines = ()=>{
+        if(this.data.isDataValid !== true){return [];}
+
+        let result = [], length = 6;
+
+        const { width_area, height_area, start, end, maxValue, minValue, deficit_width, d_area, width_signal, dateStart, dateEnd } = this.getBasicSetting();
+        const { margin_top } = this.timeline_options;
+
+        const interval = Math.floor((maxValue-minValue)/length);
+
+        for(let i=0; i<length; i++){
+            result.push({
+                y: Number(((height_area*((interval*i)/(maxValue-minValue)))+margin_top).toFixed(4)),
+                x: width_area
+            });
+        }
+
+        return result;
+    }
+
+    getGridlinesArea(){
+        if(this.data.isDataValid !== true){return null;}
+
+        const lines = this.getBasicSettingGridlines();
+
+        const { timeline_color } = this.getTheme();
+
+        return <g ref={this.svg_gridlines_area_ref} className="boxplot_gridlines_area">
+            {lines.map((l, i)=>{
+                return <line key={"boxplot_gridlines_area"+i} x1="0" y1={l.y} x2={l.x} y2={l.y} stroke="#e0e0e0" stroke-dasharray="0" stroke-linecap="butt" class="apexcharts-gridline"></line>
+            })}
+        </g>
+    }
+
     timelineEvent = {
         main_mousedown: ()=>{
             this._timeline_dragging = true;
@@ -503,12 +542,11 @@ class TraderChart extends React.Component {
         let month_days = [];
         let year_days = new Array((dateEnd.getFullYear() - dateStart.getFullYear()) + 1).fill(0);
 
-        const { theme } = this.props;
         const { timeline_pos } = this.state;
         
         let width_drag = width;
 
-        const { timeline_color } = theme in this.theme ? this.theme[theme] : this.theme["light"];
+        const { timeline_color } = this.getTheme();
 
         let days_indicator_path = new Array(days+1).fill("");
 
@@ -572,14 +610,14 @@ class TraderChart extends React.Component {
     }
 
     render(){
-        const { theme, width, height } = this.props;
+        const { width, height } = this.props;
         const { boundingClientRect } = this.state;
 
         const { margin_top } = this.timeline_options;
 
         const { width_area, height_area } = this.getBasicSetting();
 
-        const { background } = theme in this.theme ? this.theme[theme] : this.theme["light"];
+        const { background } = this.getTheme();
 
         return (<div ref={this.divMain} style={{height: (!width ? "auto" : width), height: (!height ? 500 : height), overflow: "hidden", userSelect: "none"}}>
             <svg
@@ -600,6 +638,7 @@ class TraderChart extends React.Component {
                     <rect x="0" y="0" width={boundingClientRect.width} height={boundingClientRect.height} fill={background} stroke="none"/>
 
                     <g clip-path={`url(#${"RectAreaClip_"+this.id})`}>
+                        {this.getGridlinesArea()}
                         {this.getArea()}
                     </g>
                     {this.getTimeline()}
