@@ -1,11 +1,3 @@
-/*const adjustTextBy = (textNode, width, height)=>{
-    const bb = textNode.getBBox();
-    const widthTransform = width / bb.width;
-    const heightTransform = height / bb.height;
-    const value = widthTransform < heightTransform ? widthTransform : heightTransform;
-    textNode.setAttribute("transform", "matrix("+value+", 0, 0, "+value+", 0,0)");
-}*/
-
 class TraderChart extends React.Component {
     constructor(props) {
         super(props);
@@ -18,6 +10,8 @@ class TraderChart extends React.Component {
 
         this.divMain = React.createRef();
         this.svg_area_ref = React.createRef();
+        this.svg_gridlines_area_ref = React.createRef();
+        this.svg_currency_label_ref = React.createRef();
 
         this.isWillUnmount = false;
 
@@ -110,7 +104,7 @@ class TraderChart extends React.Component {
             minVolume: minVolume,
             dateEnd: new Date(dateEnd),
             dateStart: new Date(dateStart),
-            data: result.reverse(),
+            data: result,
             isDataValid: true
         };
 
@@ -197,6 +191,9 @@ class TraderChart extends React.Component {
             const el = this.timelineElement.querySelector("g.timeline_content");
             const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
             const { width } = this.state.boundingClientRect;
+
+            this.update_currencyLabel();
+
             const { margin_right, width_signal } = this.timeline_options;
 
             const p = Math.round(width_el - (width - (margin_right + (width_signal/2))));
@@ -235,6 +232,9 @@ class TraderChart extends React.Component {
             const el = this.timelineElement.querySelector("g.timeline_content");
             const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
             const { width } = this.state.boundingClientRect;
+
+            this.update_currencyLabel();
+
             const { margin_top, margin_left, margin_right, width_signal } = this.timeline_options;
             let { timelineAnchor } = this.props;
 
@@ -292,7 +292,49 @@ class TraderChart extends React.Component {
 
                 this.svg_area_ref.current.setAttribute("transform", `translate(${timeline_pos}, ${margin_top})`);
             }
+
+            const { path: gridlines_path } = this.getBasicSettingGridlines();
+
+            if(this.svg_gridlines_area_ref && this.svg_gridlines_area_ref.current){
+                this.svg_gridlines_area_ref.current.querySelector("path.boxplot_gridlines_area_path").setAttribute("d", gridlines_path);
+            }
         }catch(e){console.log(e);}
+    }
+
+    SVG_appendTo = (node, name, attrs, text)=>{
+        let p, ns, svg = node, doc = node.ownerDocument;
+        if(!ns){
+            while(svg && svg.tagName.toLowerCase() != 'svg'){
+                svg = svg.parentNode
+            };
+            ns = { svg: svg.namespaceURI };
+            for(let a=svg.attributes, i=a.length; i--;){
+                if(a[i].namespaceURI){
+                    ns[a[i].localName] = a[i].nodeValue;
+                }
+            }
+        }
+        let el = doc.createElementNS(ns.svg, name);
+        for(let attr in attrs){
+            if(!attrs.hasOwnProperty(attr)){
+                continue;
+            }
+            if(!(p=attr.split(':'))[1]){
+                el.setAttribute(attr, attrs[attr]);
+            }else{
+                el.setAttributeNS(ns[p[0]] || null, p[1], attrs[attr]);
+            }
+        }
+        if(text){
+            el.appendChild(doc.createTextNode(text));
+        }
+        return node.appendChild(el);
+    }
+
+    SVG_clear = (node)=>{
+        while(node.lastChild){
+            node.removeChild(node.lastChild);
+        }
     }
 
     //https://apexcharts.com/javascript-chart-demos/candlestick-charts/basic/
@@ -367,14 +409,14 @@ class TraderChart extends React.Component {
         rect.width = Math.max(5, width_signal * 0.8) - 2;
 
         rect.left = rect.x = deficit_width + ((width_signal * index) - (rect.width/2));
-        rect.top = rect.y = height_area * ((d["high"] - minValue)/(maxValue - minValue));
-        rect.bottom = height_area * ((d["low"] - minValue)/(maxValue - minValue));
+        rect.top = rect.y = height_area - (height_area * ((d["high"] - minValue)/(maxValue - minValue)));
+        rect.bottom = height_area - (height_area * ((d["low"] - minValue)/(maxValue - minValue)));
         rect.right = rect.left + rect.width;
 
         rect.height = rect.bottom - rect.top;
 
-        rect.top_box = height_area * ((Math.min(d["open"], d["close"]) - minValue)/(maxValue - minValue));
-        rect.bottom_box = height_area * ((Math.max(d["open"], d["close"]) - minValue)/(maxValue - minValue));
+        rect.top_box = height_area - (height_area * ((Math.min(d["open"], d["close"]) - minValue)/(maxValue - minValue)));
+        rect.bottom_box = height_area - (height_area * ((Math.max(d["open"], d["close"]) - minValue)/(maxValue - minValue)));
 
         rect.center = rect.left + (rect.width/2);
 
@@ -406,7 +448,7 @@ class TraderChart extends React.Component {
             index = i + start;
 
             x = deficit_width + (width_signal * index);
-            y = height_area * ((v["average"] - minValue)/(maxValue - minValue));
+            y = height_area-(height_area * ((v["average"] - minValue)/(maxValue - minValue)));
 
             result.push(`${x} ${y}`);
         });
@@ -432,37 +474,98 @@ class TraderChart extends React.Component {
     }
 
     getBasicSettingGridlines = ()=>{
-        if(this.data.isDataValid !== true){return [];}
+        if(this.data.isDataValid !== true){return {path: "", labels: []};}
 
-        let result = [], length = 6;
+        try{
+            let result = {path: [], labels: []}, length = 6;
 
-        const { width_area, height_area, start, end, maxValue, minValue, deficit_width, d_area, width_signal, dateStart, dateEnd } = this.getBasicSetting();
-        const { margin_top } = this.timeline_options;
+            const { width_area, height_area, start, end, maxValue, minValue, deficit_width, d_area, width_signal, dateStart, dateEnd } = this.getBasicSetting();
+            const { margin_top } = this.timeline_options;
 
-        const interval = Math.floor((maxValue-minValue)/length);
+            const interval = Math.floor((maxValue-minValue)/length);
 
-        for(let i=0; i<length; i++){
-            result.push({
-                y: Number(((height_area*((interval*i)/(maxValue-minValue)))+margin_top).toFixed(4)),
-                x: width_area
-            });
-        }
+            for(let i=0; i<=length; i++){
+                let y = Number(((height_area*((interval*i)/(maxValue-minValue)))+margin_top).toFixed(4));
+                let label = new Intl.NumberFormat('pt-BR', {style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2}).format((interval*(length-i))+minValue);
 
-        return result;
+                result.labels.push({
+                    y: y,
+                    x: width_area,
+                    label: label
+                });
+
+                let margin_grid = i === 0 ? 0.5 : i === length ? -0.5 : 0
+
+                result.path.push(`M${0} ${y+margin_grid} L${width_area} ${y+margin_grid} Z`);
+            }
+
+            result.path = result.path.join(" ");
+
+            return result;
+        }catch(e){return {path: "", labels: []};}
     }
 
     getGridlinesArea(){
         if(this.data.isDataValid !== true){return null;}
 
-        const lines = this.getBasicSettingGridlines();
+        const { path } = this.getBasicSettingGridlines();
 
         const { timeline_color } = this.getTheme();
 
         return <g ref={this.svg_gridlines_area_ref} className="boxplot_gridlines_area">
-            {lines.map((l, i)=>{
-                return <line key={"boxplot_gridlines_area"+i} x1="0" y1={l.y} x2={l.x} y2={l.y} stroke="#e0e0e0" stroke-dasharray="0" stroke-linecap="butt" class="apexcharts-gridline"></line>
-            })}
+            <path className="boxplot_gridlines_area_path" d={path} stroke={timeline_color} stroke-dasharray="0" stroke-linecap="butt" stroke-width="1" stroke-opacity="0.1"/>
         </g>
+    }
+
+    update_currencyLabel = ()=>{
+        try{
+            const { labels } = this.getBasicSettingGridlines();
+
+            const { timeline_color } = this.getTheme();
+
+            if(this.svg_currency_label_ref && this.svg_currency_label_ref.current){
+                //this.SVG_clear(this.svg_currency_label_ref.current);
+
+                let text_list = this.svg_currency_label_ref.current.querySelectorAll("text");
+
+                if(text_list.length > labels.length){
+                    for(let i=(labels.length-1); i<text_list.length; i++){
+                        text_list[i].parentNode.removeChild(text_list[i]);
+                    }
+                    text_list = this.svg_currency_label_ref.current.querySelectorAll("text");
+                }
+
+                let width = 0;
+
+                labels.forEach((l, i) => {
+                    let el;
+
+                    if(i >= text_list.length){
+                        el = this.SVG_appendTo(this.svg_currency_label_ref.current, "text", {
+                            x: 0, y: l.y,
+                            "font-family": "Arial, Helvetica, sans-serif",
+                            "font-size": "12px",
+                            fill: timeline_color, "dominant-baseline": "central"
+                        }, l.label);
+                    }else{
+                        text_list[i].setAttribute("y", l.y);
+                        text_list[i].textContent = l.label;
+                        el = text_list[i];
+                    }
+
+                    width = Math.max(width, el.getBBox().width);
+                });
+
+                let margin_right = width + 15;
+
+                this.timeline_options.margin_right = margin_right;
+
+                const { width: width_main } = this.state.boundingClientRect;
+
+                this.svg_currency_label_ref.current.setAttribute("transform", `translate(${width_main - (margin_right - (15/2))}, 0)`);
+            }
+
+        }catch(e){console.log(e)}
     }
 
     timelineEvent = {
@@ -538,7 +641,7 @@ class TraderChart extends React.Component {
 
         const {width, height, dateEnd, dateStart} = this.getBasicSetting();
 
-        let days = Math.round((dateEnd-dateStart)/(1000*60*60*24))+1;
+        let days = Math.round((dateEnd-dateStart)/(1000*60*60*24));
         let month_days = [];
         let year_days = new Array((dateEnd.getFullYear() - dateStart.getFullYear()) + 1).fill(0);
 
@@ -641,6 +744,7 @@ class TraderChart extends React.Component {
                         {this.getGridlinesArea()}
                         {this.getArea()}
                     </g>
+                    <g ref={this.svg_currency_label_ref} className="boxplot_currency_label"></g>
                     {this.getTimeline()}
                 </g>
             </svg>
