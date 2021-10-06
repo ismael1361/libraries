@@ -2,7 +2,7 @@ class TraderChart extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            boundingClientRect: {width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0},
+            boundingClientRect: {width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, isPositionInitial: true},
             timeline_pos: 20
         };
 
@@ -127,7 +127,13 @@ class TraderChart extends React.Component {
                 const { width, height } = this.state.boundingClientRect;
 
                 if(size && JSON.stringify([width, height]) !== JSON.stringify([prevWidth, prevHeight])){
+                    const { width_area } = this.getBasicSetting();
+                    const { width_signal } = this.timeline_options;
+                    
                     this.state.boundingClientRect = JSON.parse(JSON.stringify(size));
+
+                    this.state.boundingClientRect.isPositionInitial = Math.round((Math.abs(this.state.timeline_pos)+width_area)/width_signal) > (this.data.data.length-2);
+
                     this._observeResizeTimeout = window.setTimeout(()=>{
                         this.setState({}, ()=>{
                             this.updateSVG();
@@ -192,7 +198,7 @@ class TraderChart extends React.Component {
             const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
             const { width } = this.state.boundingClientRect;
 
-            this.update_currencyLabel();
+            //this.update_currencyLabel();
 
             const { margin_right, width_signal } = this.timeline_options;
 
@@ -200,7 +206,7 @@ class TraderChart extends React.Component {
 
             this.state.timeline_pos = -p;
             //this.state.timeline_pos = 0;
-            this.updateSVG();
+            window.setTimeout(()=>{this.updateSVG()}, 100);
         }catch(e){}
     }
 
@@ -227,11 +233,11 @@ class TraderChart extends React.Component {
         }
     }
 
-    updateSVG = ()=>{
+    updateSVG = (isNewPos)=>{
         try{
             const el = this.timelineElement.querySelector("g.timeline_content");
             const { width: width_el } = el.querySelector("g.timeline_days").getBoundingClientRect();
-            const { width } = this.state.boundingClientRect;
+            const { width, isPositionInitial } = this.state.boundingClientRect;
 
             this.update_currencyLabel();
 
@@ -244,6 +250,10 @@ class TraderChart extends React.Component {
             timelineAnchor = ["start", "end", "middle"].includes(timelineAnchor) ? timelineAnchor : "middle";
 
             timeline_pos = Math.max(Math.min(timeline_pos, (margin_left + (width_signal/2))), -Math.round(width_el - (width - (margin_right + (width_signal/2)))));
+
+            if(isPositionInitial && !isNewPos){
+                timeline_pos = -Math.round(width_el - (width - (margin_right + (width_signal/2))));
+            }
 
             const labelsList = el.querySelectorAll("g.timeline_months > text, g.timeline_years > text");
 
@@ -298,6 +308,20 @@ class TraderChart extends React.Component {
             if(this.svg_gridlines_area_ref && this.svg_gridlines_area_ref.current){
                 this.svg_gridlines_area_ref.current.querySelector("path.boxplot_gridlines_area_path").setAttribute("d", gridlines_path);
             }
+
+            const { width_area, height_area } = this.getBasicSetting();
+
+            document.querySelector("#RectAreaClip_"+this.id+" > path").setAttribute("d", `M0 ${margin_top} L${width_area} ${margin_top} L${width_area} ${height_area + margin_top} L0 ${height_area + margin_top} Z`);
+
+            if(this.svg_currency_label_ref && this.svg_currency_label_ref.current){
+                let text_list = this.svg_currency_label_ref.current.querySelectorAll("text");
+
+                if(text_list.length > 0){
+                    return;
+                }
+            }
+
+            window.setTimeout(()=>{this.updateSVG()}, 100);
         }catch(e){console.log(e);}
     }
 
@@ -486,6 +510,8 @@ class TraderChart extends React.Component {
 
             for(let i=0; i<=length; i++){
                 let y = Number(((height_area*((interval*i)/(maxValue-minValue)))+margin_top).toFixed(4));
+                if(isNaN(y)){continue;}
+
                 let label = new Intl.NumberFormat('pt-BR', {style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2}).format((interval*(length-i))+minValue);
 
                 result.labels.push({
@@ -530,7 +556,9 @@ class TraderChart extends React.Component {
 
                 if(text_list.length > labels.length){
                     for(let i=(labels.length-1); i<text_list.length; i++){
-                        text_list[i].parentNode.removeChild(text_list[i]);
+                        if(text_list[i].parentNode){
+                            text_list[i].parentNode.removeChild(text_list[i]);
+                        }
                     }
                     text_list = this.svg_currency_label_ref.current.querySelectorAll("text");
                 }
@@ -565,7 +593,11 @@ class TraderChart extends React.Component {
                 this.svg_currency_label_ref.current.setAttribute("transform", `translate(${width_main - (margin_right - (15/2))}, 0)`);
             }
 
-        }catch(e){console.log(e)}
+        }catch(e){
+            window.setInterval(()=>{
+                this.update_currencyLabel();
+            }, 200);
+        }
     }
 
     timelineEvent = {
@@ -584,6 +616,22 @@ class TraderChart extends React.Component {
 
             document.removeEventListener("mousemove", this.timelineEvent.document_mousemove);
             document.addEventListener("mousemove", this.timelineEvent.document_mousemove);
+
+            document.removeEventListener("touchmove", this.timelineEvent.document_touchmove);
+            document.addEventListener("touchmove", this.timelineEvent.document_touchmove);
+
+            document.removeEventListener("touchend", this.timelineEvent.document_mouseup);
+            document.addEventListener("touchend", this.timelineEvent.document_mouseup);
+
+            document.removeEventListener("touchleave", this.timelineEvent.document_mouseup);
+            document.addEventListener("touchleave", this.timelineEvent.document_mouseup);
+
+            document.removeEventListener("touchcancel", this.timelineEvent.document_mouseup);
+            document.addEventListener("touchcancel", this.timelineEvent.document_mouseup);
+        },
+        main_touchstart: ({touches})=>{
+            this._previousTouch = touches[0];
+            this.timelineEvent.main_mousedown();
         },
         document_mouseup: ()=>{
             this._timeline_dragging = false;
@@ -596,6 +644,9 @@ class TraderChart extends React.Component {
             document.removeEventListener("mouseup", this.timelineEvent.document_mouseup);
             document.removeEventListener("mouseout", this.timelineEvent.document_mouseout);
             document.removeEventListener("mousemove", this.timelineEvent.document_mousemove);
+            document.removeEventListener("touchend", this.timelineEvent.document_mouseup);
+            document.removeEventListener("touchleave", this.timelineEvent.document_mouseup);
+            document.removeEventListener("touchcancel", this.timelineEvent.document_mouseup);
         },
         document_mouseout: (e)=>{
             e = e ? e : window.event;
@@ -618,9 +669,20 @@ class TraderChart extends React.Component {
                 }
 
                 this.state.timeline_pos = p;
-                this.updateSVG();
+                this.updateSVG(true);
             }catch(e){}
 
+        },
+        document_touchmove: (e)=>{
+            const touch = e.touches[0];
+
+            if(this._previousTouch){
+                e.movementX = touch.pageX - this._previousTouch.pageX;
+                e.movementY = touch.pageY - this._previousTouch.pageY;
+                this.timelineEvent.document_mousemove(e);
+            };
+
+            this._previousTouch = touch;
         }
     }
 
