@@ -18,11 +18,22 @@ class TraderChart extends React.Component {
         this.theme = {
             light: {
                 background: "#e0e0e0",
-                timeline_color: "#546e7a"
+                timeline_color: "#546e7a",
+                grid_line_color: "#546e7a",
+                label_color: "#546e7a",
             },
             dark: {
                 background: "#263238",
-                timeline_color: "#b0bec5"
+                timeline_color: "#b0bec5",
+                grid_line_color: "#b0bec5",
+                label_color: "#b0bec5",
+            },
+            default: {
+                boxplot_low_color: "#c0392b",
+                boxplot_high_color: "#03a678",
+                volume_low_color: "#E91E63",
+                volume_high_color: "#2196F3",
+                average_color: "#FF8900",
             }
         }
 
@@ -169,8 +180,21 @@ class TraderChart extends React.Component {
     }
 
     getTheme = ()=>{
-        const { theme } = this.props;
-        return theme in this.theme ? this.theme[theme] : this.theme["light"];
+        const { theme, config } = this.props;
+
+        let t = theme in this.theme ? this.theme[theme] : this.theme["light"];
+        t = Object.assign(this.theme.default, t);
+
+        try{
+            if(config && config.style){
+                let k = Object.keys(config.style).filter(k => Object.keys(t).includes(k));
+                k.forEach(key =>{
+                    t[key] = typeof config.style[key] === typeof t[key] ? config.style[key] : t[key];
+                });
+            }
+        }catch(e){}
+
+        return t;
     }
 
     getPathRectPanel(){
@@ -484,16 +508,18 @@ class TraderChart extends React.Component {
         if(this.data.isDataValid !== true){return null;}
         const { margin_top } = this.timeline_options;
 
+        const { boxplot_low_color, boxplot_high_color, volume_low_color, volume_high_color, average_color } = this.getTheme();
+
         return <g ref={this.svg_area_ref} className="boxplot_area" transform={`translate(${this.state.timeline_pos}, ${margin_top})`}>
-            <path className={"boxplot_area_path_volume_low"} d="" fill={'#E91E63'} fill-opacity="0.2" stroke={'none'}/>
+            <path className={"boxplot_area_path_volume_low"} d="" fill={volume_low_color} fill-opacity="0.2" stroke={'none'}/>
 
-            <path className={"boxplot_area_path_volume_high"} d="" fill={'#2196F3'} fill-opacity="0.2" stroke={'none'}/>
+            <path className={"boxplot_area_path_volume_high"} d="" fill={volume_high_color} fill-opacity="0.2" stroke={'none'}/>
 
-            <path className={"boxplot_area_path_average"} d="" fill={'none'} stroke={'#FF8900'} stroke-opacity="1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            <path className={"boxplot_area_path_average"} d="" fill={'none'} stroke={average_color} stroke-opacity="1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 
-            <path className={"boxplot_area_path_low"} d="" fill={'#c0392b'} fill-opacity="1" stroke={'#c0392b'} stroke-opacity="1" stroke-linecap="butt" stroke-width="2" stroke-dasharray="0"/>
+            <path className={"boxplot_area_path_low"} d="" fill={boxplot_low_color} fill-opacity="1" stroke={boxplot_low_color} stroke-opacity="1" stroke-linecap="butt" stroke-width="2" stroke-dasharray="0"/>
 
-            <path className={"boxplot_area_path_high"} d="" fill={'#03a678'} fill-opacity="1" stroke={'#03a678'} stroke-opacity="1" stroke-linecap="butt" stroke-width="2" stroke-dasharray="0"/>
+            <path className={"boxplot_area_path_high"} d="" fill={boxplot_high_color} fill-opacity="1" stroke={boxplot_high_color} stroke-opacity="1" stroke-linecap="butt" stroke-width="2" stroke-dasharray="0"/>
         </g>
     }
 
@@ -536,10 +562,10 @@ class TraderChart extends React.Component {
 
         const { path } = this.getBasicSettingGridlines();
 
-        const { timeline_color } = this.getTheme();
+        const { grid_line_color } = this.getTheme();
 
         return <g ref={this.svg_gridlines_area_ref} className="boxplot_gridlines_area">
-            <path className="boxplot_gridlines_area_path" d={path} stroke={timeline_color} stroke-dasharray="0" stroke-linecap="butt" stroke-width="1" stroke-opacity="0.1"/>
+            <path className="boxplot_gridlines_area_path" d={path} stroke={grid_line_color} stroke-dasharray="0" stroke-linecap="butt" stroke-width="1" stroke-opacity="0.1"/>
         </g>
     }
 
@@ -547,7 +573,7 @@ class TraderChart extends React.Component {
         try{
             const { labels } = this.getBasicSettingGridlines();
 
-            const { timeline_color } = this.getTheme();
+            const { label_color } = this.getTheme();
 
             if(this.svg_currency_label_ref && this.svg_currency_label_ref.current){
                 //this.SVG_clear(this.svg_currency_label_ref.current);
@@ -573,7 +599,7 @@ class TraderChart extends React.Component {
                             x: 0, y: l.y,
                             "font-family": "Arial, Helvetica, sans-serif",
                             "font-size": "12px",
-                            fill: timeline_color, "dominant-baseline": "central"
+                            fill: label_color, "dominant-baseline": "central"
                         }, l.label);
                     }else{
                         text_list[i].setAttribute("y", l.y);
