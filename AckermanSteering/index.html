@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="./vehicle.js"></script>
+</head>
+
+<body>
+    <script>
+        var car = new Vehicle('ackerman', 100, 90);
+        car.x = window.innerWidth / 4 + 170;
+        car.y = 200;
+
+        document.onkeydown = function (ev) {
+            var prevent = true;
+            switch (ev.keyCode) {
+                case 38: // Up
+                    car.move(1);
+                    break;
+                case 40: // Down
+                    car.move(-1);
+                    break;
+                case 37: // Left
+                    car.steer(-1);
+                    break;
+                case 39: // Right
+                    car.steer(1);
+                    break;
+                default:
+                    prevent = false;
+            }
+            if (prevent) {
+                ev.preventDefault();
+            }
+        }
+
+        document.onkeyup = function (ev) {
+            var prevent = true;
+            switch (ev.keyCode) {
+                case 38: // Up
+                    car.move(0);
+                    break;
+                case 40: // Down
+                    car.move(0);
+                    break;
+                case 37: // Left
+                    car.steer(0);
+                    break;
+                case 39: // Right
+                    car.steer(0);
+                    break;
+                default:
+                    prevent = false;
+            }
+            if (prevent)
+                ev.preventDefault();
+        }
+
+        window.requestAnimationFrame(loop = function (t) {
+            car.update(t);
+            window.requestAnimationFrame(loop);
+        });
+    </script>
+</body>
+
+</html>
