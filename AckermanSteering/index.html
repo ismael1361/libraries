@@ -7,13 +7,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title></title>
     <script src="./vehicle.js"></script>
+    <script src="./vehicle-svg.js"></script>
+    <style>
+        body, #main-svg{
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            margin: 0px;
+        }
+    </style>
 </head>
-
 <body>
+    <svg id="main-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+
     <script>
-        var car = new Vehicle('ackerman', 100, 90);
-        car.x = window.innerWidth / 4 + 170;
-        car.y = 200;
+        var olt_car = new Vehicle("main-svg", 150, 80);
+        olt_car.x = 100;
+        olt_car.y = 90;
+
+        /*var car = new Vehicle_demo('ackerman', 150, 80);
+        car.x = olt_car.x;
+        car.y = olt_car.y;
 
         document.onkeydown = function (ev) {
             var prevent = true;
@@ -63,7 +77,7 @@
         window.requestAnimationFrame(loop = function (t) {
             car.update(t);
             window.requestAnimationFrame(loop);
-        });
+        });*/
     </script>
 </body>
 

@@ -16,28 +16,37 @@
 </svg> 
 */
 
+/*let p = "M3,22 Q3,20 5,20 Q18,17 35,20 Q37,20 37,22 L38,33 Q38,35 36,35 Q18,33 4,35 Q2,35 2,33".replace(/([0-9]+)\,([0-9]+)/gi, (a, b, c)=>{
+  b = Number(b) / 40;
+  c = Number(c) / 65;
+  return "${n(w*"+Number(b.toFixed(3))+")},${n(h*"+Number(c.toFixed(3))+")}";
+});
+
+console.log(p);*/
+
 const getVehiclePth = (w, h)=>{
     let result = [];
 
     let n = (n)=>{return Number(n.toFixed(3))}
 
     result.push(`M0,${n(h*0.23)} C0,0 ${w},0 ${w},${n(h*0.23)} L${w},${n(h*0.92)} Q${w},${h} ${n(w*0.875)},${h} L${n(w*0.125)},${h} Q0,${h} 0,${n(h*0.92)}`);
-    result.push(`M3,22 Q3,20 5,20 Q18,17 35,20 Q37,20 37,22 L38,33 Q38,35 36,35 Q18,33 4,35 Q2,35 2,33`);
+
+    result.push(`M${n(w*0.046)},${n(h*0.55)} Q${n(w*0.046)},${n(h*0.5)} ${n(w*0.076)},${n(h*0.5)} Q${n(w*0.27)},${n(h*0.42)} ${n(w*0.53)},${n(h*0.5)} Q${n(w*0.56)},${n(h*0.5)} ${n(w*0.56)},${n(h*0.55)} L${n(w*0.58)},${n(h*0.825)} Q${n(w*0.58)},${n(h*0.875)} ${n(w*0.55)},${n(h*0.875)} Q${n(w*0.27)},${n(h*0.825)} ${n(w*0.061)},${n(h*0.875)} Q${n(w*0.03)},${n(h*0.875)} ${n(w*0.03)},${n(h*0.825)}`);
 
     return result;
 }
 
-function Vehicle(type, wheelBase, trackWidth) {
+function Vehicle_demo(type, wheelBase, trackWidth) {
   // radstand, spur
 
   this.wheelBase = wheelBase;
   this.trackWidth = trackWidth;
 
-  this.car = Vehicle.Types[type];
+  this.car = Vehicle_demo.Types[type];
   this.setup();
 }
 
-Vehicle.Types = {
+Vehicle_demo.Types = {
   loader: {
     steerLock: (20 / 180) * Math.PI,
     steerSpeed: 3, // 3°/sec
@@ -231,7 +240,7 @@ Vehicle.Types = {
   },
 };
 
-Vehicle.prototype = {
+Vehicle_demo.prototype = {
   speed: 0,
   acceleration: 0,
   steering: 0,
@@ -240,7 +249,7 @@ Vehicle.prototype = {
   y: Math.random() * (window.innerHeight - 300),
   prevX: 0,
   prevY: 0,
-  theta: (2 * Math.PI) / 3,
+  theta: 0,
   lastUpdate: 0,
 
   wheelBase: 0,
